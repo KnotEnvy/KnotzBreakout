@@ -1,20 +1,23 @@
-from typing import Any
 import pygame as py
 from settings import *
+from random import choice
 
 class Player(py.sprite.Sprite):
-    def __init__(self, groups):
+    def __init__(self, groups, surfacemaker):
         super().__init__(groups)
 
         #setup
-        self.image = py.Surface((WINDOW_WIDTH // 10, WINDOW_HEIGHT// 20))
-        self.image.fill('red')
+        self.surfacemaker = surfacemaker
+        self.image = surfacemaker.get_surf('player', (WINDOW_WIDTH // 10, WINDOW_HEIGHT // 20))
+
 
         #position
-        self.rect = self.image.get_rect(midbottom = (WINDOW_WIDTH * 0.5, WINDOW_HEIGHT - 20))
+        self.rect = self.image.get_rect(midbottom = (WINDOW_WIDTH // 2, WINDOW_HEIGHT - 20))
+        #create old rect
+        self.old_rect = self.rect.copy()
         self.direction = py.math.Vector2()
         self.pos = py.math.Vector2(self.rect.topleft)
-        self.speed = 300
+        self.speed = 600
 
     def input(self):
         keys = py.key.get_pressed()
@@ -25,8 +28,138 @@ class Player(py.sprite.Sprite):
         else:
             self.direction.x = 0
 
+    def screen_constraint(self):
+        if self.rect.right > WINDOW_WIDTH:
+            self.rect.right = WINDOW_WIDTH
+            self.pos.x = self.rect.x
+        if self.rect.left < 0:
+            self.rect.left = 0
+            self.pos.x = self.rect.x
+        
+
     def update(self, dt):
+        self.old_rect = self.rect.copy()
         self.input()
         self.pos.x += self.direction.x * self.speed * dt
         self.rect.x = round(self.pos.x)
+        self.screen_constraint()
 
+class Ball(py.sprite.Sprite):
+    def __init__(self, groups, player, blocks):
+        super().__init__(groups)
+
+        #collisions objects
+        self.player = player
+        self.blocks = blocks
+
+        #graphics setup
+        self.image = py.image.load('graphics/other/ball.png').convert_alpha()
+
+        #position
+        self.rect = self.image.get_rect(midbottom = player.rect.midtop)
+        self.old_rect = self.rect.copy()
+        self.pos = py.math.Vector2(self.rect.topleft)
+        self.direction = py.math.Vector2((choice((1,-1)), -1))
+        self.speed = 400
+
+        #active
+        self.active = False
+
+    def window_collision(self, direction):
+        if direction == 'horizontal':
+            if self.rect.left < 0:
+                self.rect.left = 0
+                self.pos.x = self.rect.x
+                self.direction.x *= -1
+            if self.rect.right > WINDOW_WIDTH:
+                self.rect.right = WINDOW_WIDTH
+                self.pos.x = self.rect.x
+                self.direction.x *= -1
+        if direction == 'vertical':
+            if self.rect.top < 0:
+                self.rect.top = 0
+                self.pos.y = self.rect.y
+                self.direction.y *= -1
+            if self.rect.top > WINDOW_HEIGHT:
+                self.active = False
+                self.direction *= -1
+
+    def collision(self, direction):
+        #find overlap
+        overlap_sprites = py.sprite.spritecollide(self, self.blocks, False)
+        if self.rect.colliderect(self.player.rect):
+            overlap_sprites.append(self.player)
+
+        if overlap_sprites:
+            if direction == 'horizontal':
+                for sprite in overlap_sprites:
+                    if self.rect.right >= sprite.rect.left and self.old_rect.right <= sprite.old_rect.left:
+                        self.rect.right = sprite.rect.left - 1
+                        self.pos.x = self.rect.x
+                        self.direction.x *= -1
+                    if self.rect.left <= sprite.rect.right and self.old_rect.left >= sprite.old_rect.right:
+                        self.rect.left = sprite.rect.right + 1
+                        self.pos.x = self.rect.x
+                        self.direction.x *= -1
+
+                    if getattr(sprite, 'health', None):
+                        sprite.get_damage(1)
+
+            if direction == 'vertical':
+                for sprite in overlap_sprites:
+                    if self.rect.bottom >= sprite.rect.top and self.old_rect.bottom <= sprite.old_rect.top:
+                        self.rect.bottom = sprite.rect.top - 1 
+                        self.pos.y = self.rect.y
+                        self.direction.y *= -1
+
+                    if self.rect.top <= sprite.rect.bottom and self.old_rect.top >= sprite.old_rect.bottom:
+                        self.rect.top = sprite.rect.bottom + 1
+                        self.pos.y = self.rect.y
+                        self.direction.y *= -1
+
+                    if getattr(sprite, 'health', None):
+                        sprite.get_damage(1)
+    
+    def update(self, dt):
+        if self.active:
+
+            if self.direction.magnitude() != 0:
+                self.direction = self.direction.normalize()
+
+            #create old rect
+            self.old_rect = self.rect.copy()
+
+            # horizontal movement plus collisions
+            self.pos.x += self.direction.x * self.speed * dt
+            self.rect.x = round(self.pos.x)
+            self.collision('horizontal')
+            self.window_collision('horizontal')
+            
+            # vertical movement plus collisions
+            self.pos.y += self.direction.y * self.speed * dt
+            self.rect.y = round(self.pos.y)
+            self.collision('vertical')
+            self.window_collision('vertical')
+        else:
+            self.rect.midbottom = self.player.rect.midtop
+            self.pos = py.math.Vector2(self.rect.topleft)
+
+class Block(py.sprite.Sprite):
+    def __init__(self, block_type, pos, groups, surfacemaker):
+        super().__init__(groups)
+        self.surfacemaker = surfacemaker
+        self.image = self.surfacemaker.get_surf('red', (BLOCK_WIDTH, BLOCK_HEIGHT))
+        self.rect = self.image.get_rect(topleft = pos)
+        self.old_rect = self.rect.copy()
+
+        #damage info
+        self.health = int(block_type)
+
+    def get_damage(self, amount):
+        self.health -= amount
+
+        if self.health > 0:
+            #update image
+            pass
+        else:
+            self.kill()
