@@ -1,6 +1,24 @@
 import pygame as py
+from pygame.sprite import _Group
 from settings import *
 from random import choice
+
+class Upgrade(py.sprite.Sprite):
+    def __init__(self, pos, upgrade_type, groups):
+        super().__init__(groups)
+        self.upgrade_type = upgrade_type
+        self.image = py.image.load(f'graphics/upgrades/{upgrade_type}').convert_alpha()
+        self.rect = self.image.get_rect(midtop = pos)
+
+        self.pos = py.math.Vector2(self.rect.topleft)
+        self.speed = 300
+
+    def update(self, dt):
+        self.pos.y += self.speed * dt
+        self.rect.y = round(self.pos.y)
+
+        if self.rect.top > WINDOW_HEIGHT +100:
+            self.kill()
 
 class Player(py.sprite.Sprite):
     def __init__(self, groups, surfacemaker):
@@ -18,6 +36,7 @@ class Player(py.sprite.Sprite):
         self.direction = py.math.Vector2()
         self.pos = py.math.Vector2(self.rect.topleft)
         self.speed = 600
+        self.hearts = 3
 
     def input(self):
         keys = py.key.get_pressed()
@@ -80,9 +99,11 @@ class Ball(py.sprite.Sprite):
                 self.rect.top = 0
                 self.pos.y = self.rect.y
                 self.direction.y *= -1
-            if self.rect.top > WINDOW_HEIGHT:
+
+            if self.rect.bottom > WINDOW_HEIGHT:
                 self.active = False
-                self.direction *= -1
+                self.direction.y = -1
+                self.player.hearts -= 1
 
     def collision(self, direction):
         #find overlap
@@ -145,7 +166,7 @@ class Ball(py.sprite.Sprite):
             self.pos = py.math.Vector2(self.rect.topleft)
 
 class Block(py.sprite.Sprite):
-    def __init__(self, block_type, pos, groups, surfacemaker):
+    def __init__(self, block_type, pos, groups, surfacemaker, create_upgrade):
         super().__init__(groups)
         self.surfacemaker = surfacemaker
         self.image = self.surfacemaker.get_surf(COLOR_LEGEND[block_type], (BLOCK_WIDTH, BLOCK_HEIGHT))

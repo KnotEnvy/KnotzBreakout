@@ -1,9 +1,8 @@
 import pygame as py
 import sys, time
 from settings import *
-from sprites import Player, Ball, Block, Upgrade
+from sprites import Player, Ball, Block
 from surfacemaker import SurfaceMaker
-from random import choice
 
 class Game:
     def __init__(self):
@@ -19,7 +18,6 @@ class Game:
         #sprite group setup
         self.all_sprites = py.sprite.Group()
         self.block_sprites = py.sprite.Group()
-        self.upgrade_sprites = py.sprite.Group()
  
         #setup for sprites
         self.surfacemaker = SurfaceMaker()
@@ -27,12 +25,6 @@ class Game:
         self.stage_setup()
         self.ball = Ball(self.all_sprites, self.player, self.block_sprites)
         
-        #hearts
-        self.heart_surf = py.image.load('graphics/other/heart.png').convert_alpha()
-
-    def create_upgrade(self):
-        upgrade_type = choice(UPGRADES)
-        Upgrade(pos, upgrade_type=, [self.all_sprites, self.upgrade_sprites])
 
     def create_bg(self):
         bg_original = py.image.load('graphics/other/bg2.png').convert_alpha()
@@ -48,14 +40,10 @@ class Game:
             for col_index, col in enumerate(row):
                 if col != ' ':
                     #find postion of all blocks
+                    y = row_index * (BLOCK_HEIGHT + GAP_SIZE) + GAP_SIZE // 2
                     x = col_index * (BLOCK_WIDTH + GAP_SIZE) + GAP_SIZE // 2
-                    y = TOP_OFFSET + row_index * (BLOCK_HEIGHT + GAP_SIZE) + GAP_SIZE // 2
-                    Block(col, (x,y), [self.all_sprites, self.block_sprites], self.surfacemaker, self.create_upgrade)
+                    Block(col, (x,y), [self.all_sprites, self.block_sprites], self.surfacemaker)
 
-    def display_hearts(self):
-        for i in range(self.player.hearts):
-            x = 2 + i * (self.heart_surf.get_width() + 2)
-            self.display_surface.blit(self.heart_surf, (x,4))
 
     def run(self):
         last_time = time.time()
@@ -67,7 +55,7 @@ class Game:
 
             #event loop
             for event in py.event.get():
-                if event.type == py.QUIT or self.player.hearts <= 0: #remember to change ENDGAME
+                if event.type == py.QUIT:
                     py.quit()
                     sys.exit()
                 if event.type == py.KEYDOWN:
@@ -81,7 +69,6 @@ class Game:
             #draw frame
             self.display_surface.blit(self.bg, (0,0))
             self.all_sprites.draw(self.display_surface)
-            self.display_hearts()
 
             #update window
             py.display.update()
